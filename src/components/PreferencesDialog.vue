@@ -1,21 +1,28 @@
 <template>
     <div>
-        <!-- Selector themes -->
-        <Dropdown @change="$emit('themeChanged', selectedTheme)" class="small_dropdown" v-model="selectedTheme" :options="themes" optionLabel="name" placeholder="Select a theme:"/>
-        <!-- Selector themes -->
-        <!-- Selector fonts_sizes -->
-        <Dropdown @change="$emit('fontSizeChanged', selectedFontSize)" v-model="selectedFontSize" :options="fonts_sizes" optionLabel="name" placeholder="Select a font size:"/>
-        <!-- Selector fonts_sizes -->
+        <!-- Selector for themes -->
+        <PrimeVueDropdown
+            v-model="selectedTheme"
+            :options="themes" optionLabel="name"
+            placeholder="Select a theme:"
+            @change="$emit('themeChanged', selectedTheme)"
+        />
+        
+        <!-- Selector for fonts_sizes -->
+        <PrimeVueDropdown
+            v-model="selectedFontSize"
+            :options="fonts_sizes" optionLabel="name"
+            placeholder="Select a font size:"
+            @change="$emit('fontSizeChanged', selectedFontSize)"
+            style="margin-left: 10px;"
+        />
     </div>
 </template>
 
 <script>
-import Dropdown from 'primevue/dropdown';
+
 
 export default {
-    components:{
-		Dropdown,
-    },
     emits: ['themeChanged', 'fontSizeChanged'],
     data(){
         return {
@@ -70,26 +77,19 @@ export default {
             ],
             selectedFontSize: null,
             fonts_sizes: [
-                {name: '10px', code: '10px'},
-                {name: '11px', code: '11px'},
-                {name: '12px', code: '12px'},
-                {name: '13px', code: '13px'},
-                {name: '14px', code: '14px'},
-                {name: '16px', code: '16px'},
-                {name: '18px', code: '18px'},
-                {name: '20px', code: '20px'},
-                {name: '24px', code: '24px'},
-                {name: '48px', code: '48px'},
+                {name: '10px', code: 10},
+                {name: '11px', code: 11},
+                {name: '12px', code: 12},
+                {name: '13px', code: 13},
+                {name: '14px', code: 14},
+                {name: '16px', code: 16},
+                {name: '18px', code: 18},
+                {name: '20px', code: 20},
+                {name: '24px', code: 24},
+                {name: '48px', code: 48},
             ],
         }
     },
 }
 </script>
-
-<style>
-    .small_dropdown { 
-        font-size: 12px;
-        padding: 4px;
-    }
-</style>
 

@@ -1,21 +1,35 @@
 <template>
 	<div>
-		<Menubar :model="editorBarItems" class="editor_bar"/>
-		<TabMenu @tab-change="tabChanged" :model="tabs_list" v-model:activeIndex="tabSelected"/>
+		<!-- Editor bar -->
+		<PrimeVueMenubar :model="editorBarItems" class="editor_bar"/>
+		<PrimeVueTabView v-model:activeIndex="tabSelected" :scrollable="true" @tab-change="tabChanged">
+			<PrimeVueTabPanel v-for="tab in tabs_list" :key="tab.label" :header="tab.label"/>
+		</PrimeVueTabView>
 
-		<Dialog header="Prefixes manager" v-model:visible="displayPrefixes"
+		<!-- Textarea used for CodeMirror -->
+		<textarea v-model="contents[tabSelected]" id="editor"></textarea>
+
+		<!-- Editor footer -->
+		<div class="editor_footer"> Ln {{this.currentLineNumber}}, Col {{this.currentColNumber}}</div>
+
+		<!-- Dialog popups -->
+		<PrimeVueDialog header="Prefixes manager" v-model:visible="displayPrefixes"
 			:style="{width: '75vw'}" :maximizable="true"
 			:modal="false" :draggable="false" ref="prefixesdialog">
-			<PrefixesDialog @insertentry="insertEntryIntoCode"/>
-		</Dialog>
-		<Dialog header="Preferences" v-model:visible="displayPreferences"
+			<PrefixesDialog
+				@insertEntryIntoCode="insertEntry"
+				@insertEntryGroupIntoCode="insertEntryGroup"
+			/>
+		</PrimeVueDialog>
+
+		<PrimeVueDialog header="Preferences" v-model:visible="displayPreferences"
 			:style="{width: '75vw'}" :maximizable="true"
 			:modal="false" :draggable="false" ref="preferencesdialog">
-			<PreferencesDialog @fontSizeChanged="changeFontSize" @themeChanged="changeTheme"/>
-		</Dialog>
-
-		<textarea v-model="contents[tabSelected]" id="editor"></textarea>
-		<div class="editor_footer"> Ln {{this.currentLineNumber}}, Col {{this.currentColNumber}}</div>
+			<PreferencesDialog
+				@fontSizeChanged="changeFontSize"
+				@themeChanged="changeTheme"
+			/>
+		</PrimeVueDialog>
 	</div>
 </template>
 
@@ -29,7 +43,7 @@ import 'codemirror/addon/hint/anyword-hint.js';
 import 'codemirror/addon/edit/matchbrackets.js';
 import 'codemirror/addon/edit/closebrackets.js';
 
-//import 'codemirror/theme/midnight.css';
+// all themes
 import 'codemirror/theme/3024-day.css'
 import 'codemirror/theme/3024-night.css'
 import 'codemirror/theme/abcdef.css'
@@ -77,26 +91,21 @@ import 'codemirror/theme/xq-light.css'
 import 'codemirror/theme/yeti.css'
 import 'codemirror/theme/zenburn.css'
 
-import {PrimeIcons} from 'primevue/api';
-import Menubar from 'primevue/menubar';
-import Dialog from 'primevue/dialog';
+import { PrimeIcons } from 'primevue/api';
+import { nextTick } from 'vue'
 import PrefixesDialog from '@/components/PrefixesDialog.vue'
 import PreferencesDialog from '@/components/PreferencesDialog.vue'
-import TabMenu from 'primevue/tabmenu';
 
 export default {
-  name: 'SparqlEditor',
-  props: {
-    codeValue: String,
-  },
-  components:{
-		Menubar,
-		TabMenu,
-		Dialog,
+	name: 'SparqlEditor',
+	props: {
+	codeValue: String,
+	},
+	components:{
 		PrefixesDialog,
 		PreferencesDialog,
-  },
-  data(){
+	},
+	data(){
 		return{
 			theme: 'rubyblue',
 			currentLineNumber: "",
@@ -109,6 +118,7 @@ export default {
 			],
 			tabsAmount: 1,
 			tabSelected: 0,
+			fontSize: 12,
 			displayPrefixes: false,
 			displayPreferences: false,
 			show_querry_panel: false,
@@ -119,17 +129,6 @@ export default {
 					icon: PrimeIcons.DATABASE,
 					command: () => {
 					this.displayPrefixes = true;
-					},
-				}, {
-					label:'Panel',
-					icon:'',
-					command: () => {
-						if(this.show_querry_panel == true){
-							this.show_querry_panel = false;
-						}else{
-							this.show_querry_panel = true;
-						}
-						this.$emit('hideshow_querry_panel', this.show_querry_panel);
 					},
 				}, {
 					label: 'Preferences',
@@ -143,38 +142,54 @@ export default {
 					command: () => {
 						this.addTab()
 					},
+				}, {
+					label: 'Delete Tab',
+					icon: '',
+					command: () => {
+						this.deleteTab()
+					},
 				}],
 		}
-  },
-  mounted(){
-	this.cm = CodeMirror.fromTextArea(document.getElementById('editor'), {
-		id: "codemirror",
-		lineNumbers: true,
-		theme: this.theme,
-		mode: 'sparql',
-		autofocus: true,
-		matchBrackets: true,
-		autoCloseBrackets: true,
-		lineWrapping: true,
-		extraKeys: {"Ctrl-Space": "autocomplete" },
-		completeSingle: false,
-		hintOptions: {
-			completeSingle:false,
-		}});
+},
+	mounted(){
+		/**
+		 * Creates Codemirror instance from textarea in template with our options.
+		 */
+		this.cm = CodeMirror.fromTextArea(document.getElementById('editor'), {
+			id: "codemirror",
+			viewportMargin: Infinity,
+			lineNumbers: true,
+			theme: this.theme,
+			mode: 'sparql',
+			autofocus: true,
+			matchBrackets: true,
+			autoCloseBrackets: true,
+			lineWrapping: true,
+			extraKeys: {"Ctrl-Space": "autocomplete" },
+			completeSingle: false,
+			hintOptions: {
+				completeSingle:false,
+			}});
+		
+		/**
+		 * Array containing SPARQL keywords in uppercase. This array is used to construct lower case copy and then these 2 merged are used for
+		 * autocompletion.
+		 */
+		const keyWordsUp=[
+				"BASE", "PREFIX", "SELECT", "ASK", "CONSTRUCT", "DESCRIBE", "DISTINCT", "REDUCED",
+				"FROM", "NAMED", "WHERE", "GRAPH", "UNION", "FILTER", "OPTIONAL", "ORDER",
+				"LIMIT", "OFFSET", "BY", "ASC", "DESC", "STR", "LANG", "LANGMATCHES",
+				"DATATYPE", "BOUND", "SAMETERM", "ISIRI", "ISURI", "ISBLANK", "ISLITERAL", "REGEX",
+				"CONCAT", "BIND", "NOT", "EXISTS", "MINUS", "AS", "VALUES", "UNDEF",
+				"GROUP", "HAVING", "SUM", "AVG", "REDUCED"]
+		const keyWordsLow = keyWordsUp.map(element => {
+			return element.toLowerCase();
+		})
+		const keyWords = keyWordsUp.concat(keyWordsLow)
 
-	var scope_ = this
-	this.cm.on("keyup", function (cm) {
-        scope_.contents[scope_.tabSelected] = cm.getValue()
-    });
-	
-    const keyWords=[
-			"BASE", "PREFIX", "SELECT", "ASK", "CONSTRUCT", "DESCRIBE", "DISTINCT", "REDUCED",
-			"FROM", "NAMED", "WHERE", "GRAPH", "UNION", "FILTER", "OPTIONAL", "ORDER",
-			"LIMIT", "OFFSET", "BY", "ASC", "DESC", "STR", "LANG", "LANGMATCHES",
-			"DATATYPE", "BOUND", "SAMETERM", "ISIRI", "ISURI", "ISBLANK", "ISLITERAL", "REGEX",
-			"CONCAT", "BIND", "NOT", "EXISTS", "MINUS", "AS", "VALUES", "UNDEF",
-			"GROUP", "HAVING", "SUM", "AVG", "REDUCED"];
-
+		/**
+		 * Overwriting Codemirrors anyhint autocompletion mode for SPARQL autocompletion.
+		 */
 		CodeMirror.hint.anyword = function (editor) {
 				//get cursor and current line
 				const cursor = editor.getCursor();
@@ -198,49 +213,132 @@ export default {
 				result.list.sort();
 				return result;
 		};
-		//AUTO COMPLETE EDIT END
 
-		//updates
-		this.cm.on("cursorActivity", this.updateInfo);
-		this.updateInfo();
-  },
-  methods: {
-    updateInfo() {
+		/**
+		 * Calls update of information displaying text cursor location when text cursor moves.
+		 */
+		this.cm.on("cursorActivity", this.updateInfo)
+
+		/**
+		 * Calls update of contents of tabs on keyups so we dont have to have new instance for each tab.
+		 */
+		this.cm.on("keyup", this.updateContents)
+
+		this.updateInfo()
+	},
+	methods: {
+		/**
+		 * Updates information displaying line and column number.
+		 */
+		updateInfo() {
 			const cursor = this.cm.getCursor();
 			this.currentLineNumber = cursor.line + 1;
 			this.currentColNumber = cursor.ch;
-    },
-	addTab(){
-		this.tabsAmount += 1;
-		this.tabs_list.push({label: 'Tab ' + this.tabsAmount})
-		this.contents.push('')
-	},
-	insertEntryIntoCode(){
+		},
 
-	},
-	changeTheme(theme){
-		console.log(theme)
-		this.cm.setOption("theme", theme.code)
-	},
-	changeFontSize(font_size){
-		console.log(font_size)
-		// var cols = document.getElementsByClassName('Codemirror');
-		// let i = 0
-		// for(i = 0; i < cols.length; i++) {
-		// 	cols[i].style.font_size = font_size.code;
-		// }
-	},
-	tabChanged(event){
-		this.cm.setValue(this.contents[event.index])
+		/**
+		 * Updates Contents array for current tab with code value.
+		 */
+		updateContents() {
+			this.contents[this.tabSelected] = this.cm.getValue()
+		},
+
+		/**
+		 * Adds new tab of code.
+		 */
+		async addTab(){
+			this.tabsAmount += 1;
+			this.tabs_list.push({label: 'Tab ' + this.tabsAmount})
+			this.contents.push('')
+			await nextTick()
+			let cmColor = window.getComputedStyle(document.querySelector('.CodeMirror'), null).getPropertyValue('color')
+			document.querySelectorAll('.p-tabview .p-tabview-nav li .p-tabview-nav-link').forEach(element => element.style.color = cmColor)
+			document.querySelectorAll('.p-tabview .p-tabview-nav li.p-highlight .p-tabview-nav-link').forEach(element => element.style.color = cmColor)
+		},
+
+		deleteTab(){
+			if(this.tabsAmount > 1 && this.tabSelected != 0){
+				this.tabs_list.splice(this.tabs_list.indexOf(this.tabs_list[this.tabSelected]), 1)
+				this.tabsAmount -= 1
+				this.tabSelected = 0
+			}
+		},
+
+		insertEntryGroup(entries){
+			entries.data.forEach(entry => {
+				this.insertEntry(entry)
+			})
+		},
+
+		insertEntry(entry){
+			let newEntry = "PREFIX " + entry.namespace + ": <" + entry.uri + ">\n"
+			this.cm.setValue(newEntry + this.cm.getValue())
+		},
+
+		/**
+		 * Changes theme based on emit from PreferencesDialog component.
+		 */
+		changeTheme(theme){
+			//change theme
+			this.cm.setOption("theme", theme.code)
+
+			//get CodeMirror styles
+			let cmBg = window.getComputedStyle(document.querySelector('.CodeMirror'), null).getPropertyValue('background')
+			let cmColor = window.getComputedStyle(document.querySelector('.CodeMirror'), null).getPropertyValue('color')
+
+			//set editor_bar
+			document.querySelector('.editor_bar').style.background = cmBg
+			document.querySelectorAll('.p-menubar .p-menubar-root-list > .p-menuitem > .p-menuitem-link .p-menuitem-text').forEach(element => element.style.color = cmColor)
+			document.querySelectorAll('.p-menubar .p-menubar-root-list > .p-menuitem > .p-menuitem-link .p-menuitem-icon').forEach(element => element.style.color = cmColor)
+
+			//tab menu
+			document.querySelector('.p-tabview').style.background = cmBg
+			document.querySelectorAll('.p-tabview .p-tabview-nav li .p-tabview-nav-link').forEach(element => element.style.color = cmColor)
+			document.querySelectorAll('.p-tabview .p-tabview-nav li.p-highlight .p-tabview-nav-link').forEach(element => element.style.color = cmColor)
+
+			//set editor footer
+			document.querySelector('.editor_footer').style.background = cmBg
+			document.querySelector('.editor_footer').style.color = cmColor
+		},
+
+		/**
+		 * Changes font size based on emit from PreferencesDialog component.
+		 */
+		changeFontSize(font_size){
+			this.fontSize = font_size.code
+			document.querySelector('.CodeMirror').style.fontSize = this.fontSize + 'px';
+		},
+
+		/**
+		 * Changes displayed code based on chosen tab.
+		 */
+		tabChanged(event){
+			this.cm.setValue(this.contents[event.index])
+		}
 	}
-  }
 }
 </script>
 
 <style>
+	.CodeMirror {
+		height: auto;
+	}
+
+	.p-dropdown .p-dropdown-label.p-placeholder{
+		padding: 0.4rem;
+	}
+
+	.p-dropdown .p-inputtext{
+		padding: 0.4rem;
+	}
+
 	.p-button {
 		margin: 0.3rem .5rem;
 		min-width: 10rem;
+	}
+
+	.p-tabview-panels {
+		display: none;
 	}
 
 	p {
@@ -259,49 +357,46 @@ export default {
 
 	.editor_bar {
 		height: 4vh;
-		background: #0F192A;
 		border-bottom: 1px solid #ddd !important;
-		background-color: rgb(15, 25, 42) !important;
-		color: #ddd;
-    }
+	}
 
-    .main {
-			height: 85vh;
-    }
+	.main {
+		height: 85vh;
+	}
 
-    .editor_footer {
-			background: #0F192A;
-			border-top: 1px solid #ddd;
-			color: #ddd;
-    }
+	.editor_footer {
+		border-top: 1px solid #ddd;
+		font-family: monospace;
+	}
 
-    .p-menuitem {
-        z-index: 10;
-    }
+	.p-menuitem {
+		z-index: 10;
+	}
 
-    .table-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+	.table-header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
 
-    @media screen and (max-width: 960px) {
-        align-items: start;
+	@media screen and (max-width: 960px) {
+		align-items: start;
 	}
 }
 
 .confirmation-content {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+	display: flex;
+	align-items: center;
+	justify-content: center;
 }
+
 @media screen and (max-width: 960px) {
 	::v-deep(.p-toolbar) {
 		flex-wrap: wrap;
-    }
-    
-    .p-button {
-        margin-bottom: 0.25rem;
-    }
+	}
+	
+	.p-button {
+		margin-bottom: 0.25rem;
+	}
 }
 
 </style>
