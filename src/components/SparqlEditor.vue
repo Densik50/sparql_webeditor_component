@@ -1,5 +1,5 @@
 <template>
-	<div>
+	<div style="height: 100%">
 		<!-- Editor bar -->
 		<PrimeVueMenubar :model="editorBarItems" class="editor_bar"/>
 		<PrimeVueTabView v-model:activeIndex="tabSelected" :scrollable="true" @tab-change="tabChanged">
@@ -110,12 +110,8 @@ export default {
 			theme: 'rubyblue',
 			currentLineNumber: "",
 			currentColNumber: "",
-			contents: [
-				'PREFIX a: <http://www.w3.org/2000/10/annotation-ns#>\nPREFIX dc: <http://purl.org/dc/elements/1.1/>\nPREFIX foaf: <http://xmlns.com/foaf/0.1/>\nPREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n # Comment!\n SELECT ?given ?family\nWHERE {\n{\n?annot a:annotates <http://www.w3.org/TR/rdf-sparql-query/> .\n?annot dc:creator ?c .\nOPTIONAL {?c foaf:givenName ?given ;\nfoaf:familyName ?family }\n} UNION {\n?c !foaf:knows/foaf:knows? ?thing.\n?thing rdfs\n} MINUS {\n?thing rdfs:label "剛柔流"@jp\n}\nFILTER isBlank(?c)\n}\n',
-			],
-			tabs_list: [
-				{label: 'Main'},
-			],
+			contents: [],
+			tabs_list: [{label: 'Main'},],
 			tabsAmount: 1,
 			tabSelected: 0,
 			fontSize: 12,
@@ -225,8 +221,22 @@ export default {
 		this.cm.on("keyup", this.updateContents)
 
 		this.updateInfo()
+		let saved_theme = window.localStorage.getItem('sparqleditor_theme')
+		this.changeTheme(JSON.parse(saved_theme) || {name: 'cobalt', code: 'cobalt'})
+		let saved_fontsize = window.localStorage.getItem('sparqleditor_fontSize')
+		this.changeFontSize(JSON.parse(saved_fontsize) || {name: '12px', code: 12})
+		let saved_contents = window.localStorage.getItem('sparqleditor_contents')
+		this.contents = JSON.parse(saved_contents) || ['PREFIX a: <http://www.w3.org/2000/10/annotation-ns#>\nPREFIX dc: <http://purl.org/dc/elements/1.1/>\nPREFIX foaf: <http://xmlns.com/foaf/0.1/>\nPREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>\n # Comment!\n SELECT ?given ?family\nWHERE {\n{\n?annot a:annotates <http://www.w3.org/TR/rdf-sparql-query/> .\n?annot dc:creator ?c .\nOPTIONAL {?c foaf:givenName ?given ;\nfoaf:familyName ?family }\n} UNION {\n?c !foaf:knows/foaf:knows? ?thing.\n?thing rdfs\n} MINUS {\n?thing rdfs:label "剛柔流"@jp\n}\nFILTER isBlank(?c)\n}\n']
+		let saved_tabs = window.localStorage.getItem('sparqleditor_tabs')
+		this.tabs_list = JSON.parse(saved_tabs) || [{label: 'Main'}]
+		this.cm.setValue(this.contents[0])
 	},
 	methods: {
+
+		getCode(){
+			return this.contents[this.tabSelected]
+		},
+
 		/**
 		 * Updates information displaying line and column number.
 		 */
@@ -241,6 +251,8 @@ export default {
 		 */
 		updateContents() {
 			this.contents[this.tabSelected] = this.cm.getValue()
+			console.log(this.contents)
+			window.localStorage.setItem('sparqleditor_contents', JSON.stringify(this.contents));
 		},
 
 		/**
@@ -254,13 +266,19 @@ export default {
 			let cmColor = window.getComputedStyle(document.querySelector('.CodeMirror'), null).getPropertyValue('color')
 			document.querySelectorAll('.p-tabview .p-tabview-nav li .p-tabview-nav-link').forEach(element => element.style.color = cmColor)
 			document.querySelectorAll('.p-tabview .p-tabview-nav li.p-highlight .p-tabview-nav-link').forEach(element => element.style.color = cmColor)
+			window.localStorage.setItem('sparqleditor_contents', JSON.stringify(this.contents));
+			window.localStorage.setItem('sparqleditor_tabs', JSON.stringify(this.tabs_list));
 		},
 
 		deleteTab(){
 			if(this.tabsAmount > 1 && this.tabSelected != 0){
-				this.tabs_list.splice(this.tabs_list.indexOf(this.tabs_list[this.tabSelected]), 1)
+				this.contents.splice(this.tabSelected, 1)
+				this.tabs_list.splice(this.tabSelected, 1)
 				this.tabsAmount -= 1
 				this.tabSelected = 0
+				this.cm.setValue(this.contents[this.tabSelected])
+				window.localStorage.setItem('sparqleditor_contents', JSON.stringify(this.contents));
+				window.localStorage.setItem('sparqleditor_tabs', JSON.stringify(this.tabs_list));
 			}
 		},
 
@@ -299,6 +317,8 @@ export default {
 			//set editor footer
 			document.querySelector('.editor_footer').style.background = cmBg
 			document.querySelector('.editor_footer').style.color = cmColor
+
+			window.localStorage.setItem('sparqleditor_theme', JSON.stringify(theme));
 		},
 
 		/**
@@ -307,6 +327,7 @@ export default {
 		changeFontSize(font_size){
 			this.fontSize = font_size.code
 			document.querySelector('.CodeMirror').style.fontSize = this.fontSize + 'px';
+			window.localStorage.setItem('sparqleditor_fontSize', JSON.stringify(font_size));
 		},
 
 		/**
@@ -321,7 +342,7 @@ export default {
 
 <style>
 	.CodeMirror {
-		height: auto;
+		height: 100%;
 	}
 
 	.p-dropdown .p-dropdown-label.p-placeholder{

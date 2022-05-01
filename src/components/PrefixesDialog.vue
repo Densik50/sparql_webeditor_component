@@ -116,12 +116,7 @@
         </div>
     </div>
 </template>
-
 <script>
-
-//TODO editing entry
-//TODO dialog for new group name
-//TODO dialog for new entry namespace, iri
 
 export default {
     name: 'PrefixesDialog',
@@ -212,10 +207,6 @@ export default {
             }
             fr.readAsText(event.files[0]);
             //TODO reset fileuploader
-        },
-        editEntry(entry) {
-            console.log(entry);
-            window.localStorage.setItem('sparqleditor_prefixes', JSON.stringify(this.prefixes_data));
         },
         insertGroup() {
             this.$emit('insertEntryGroupIntoCode', this.prefixes_data[this.prefixes_data.indexOf(this.selected_group)])
